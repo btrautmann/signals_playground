@@ -37,11 +37,11 @@ class DataHolder {
     effect(() async {
       _data.value = const AsyncLoading();
       try {
-        await Future<void>.delayed(const Duration(seconds: 1));
+        // await Future<void>.delayed(const Duration(seconds: 1));
         // Placing this `print` BEFORE the `await` will cause the UI to
         // work as expected. As it is, the UI will not update after the first
         // running of this `effect`.
-        print('Effect running for ${mainSignal.value}');
+        // print('Effect running for ${mainSignal.value}');
         _data.value = AsyncData(
           DailyNetIncomeData(
             dailyIncome: mainSignal.value + Random().nextInt(100),

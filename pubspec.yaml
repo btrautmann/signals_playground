@@ -12,6 +12,7 @@ dependencies:
     sdk: flutter
   hooks_riverpod: ^2.4.9
   provider: ^6.1.1
+  rxdart: ^0.27.7
   signals: ^1.4.1
 
 dev_dependencies:
