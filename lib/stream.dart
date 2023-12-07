@@ -3,15 +3,12 @@ import 'dart:math';
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart' hide Provider;
 import 'package:provider/provider.dart';
-import 'package:rxdart/rxdart.dart';
-import 'package:signal_repro/async_value_holder.dart';
-import 'package:signals/signals_flutter.dart';
+import 'package:state_beacon/state_beacon.dart';
 
 // This signal is used to simulate a piece of data that can
 // change many times throughout the app's lifecycle.
-final mainSignal = signal<int>(0);
+final mainSignal = Beacon.writable(0);
 
 void main() {
   // Pretend to fetch new data from the server that other state in the
@@ -24,11 +21,10 @@ void main() {
 
 // A simple state container that exposes a signal to be displayed on the UI
 class DataHolder {
-  final StreamController<AsyncValue<DailyNetIncomeData>> _controller = StreamController();
-  StreamSignal<AsyncValue<DailyNetIncomeData>> get data => _data;
-  late final _data = streamSignal(
-    () => _controller.stream.asBroadcastStream().startWith(const AsyncLoading()),
-  );
+  final StreamController<DailyNetIncomeData> _controller = StreamController();
+
+  //
+  late final data = Beacon.stream(_controller.stream.asBroadcastStream());
 
   DataHolder() {
     // In lieu of something like a `StreamSignal` that automatically reevaluates
@@ -38,8 +34,7 @@ class DataHolder {
   }
 
   void _observe() {
-    effect(() async {
-      _controller.add(const AsyncLoading());
+    Beacon.createEffect(() async {
       try {
         // await Future<void>.delayed(const Duration(seconds: 1));
         // Placing this `print` BEFORE the `await` will cause the UI to
@@ -47,16 +42,14 @@ class DataHolder {
         // running of this `effect`.
         // print('Effect running for ${mainSignal.value}');
         _controller.add(
-          AsyncData(
-            DailyNetIncomeData(
-              dailyIncome: mainSignal.value + Random().nextInt(100),
-              totalIncome: mainSignal.value + Random().nextInt(100),
-              averageNetIncome: mainSignal.value + Random().nextInt(100),
-            ),
+          DailyNetIncomeData(
+            dailyIncome: mainSignal.value + Random().nextInt(100),
+            totalIncome: mainSignal.value + Random().nextInt(100),
+            averageNetIncome: mainSignal.value + Random().nextInt(100),
           ),
         );
-      } catch (e) {
-        _controller.add(AsyncError(e, StackTrace.current));
+      } catch (e, s) {
+        _controller.addError(e, s);
       }
     });
   }
@@ -71,19 +64,28 @@ class MainApp extends StatelessWidget {
       create: (context) => DataHolder(),
       child: MaterialApp(
         home: Scaffold(
-          body: Watch((context) {
-            final value = context.read<DataHolder>().data;
-            print('Rebuilding with ${value.value}');
-            return AsyncValueHolder(
-              value: value.value ?? const AsyncLoading<DailyNetIncomeData>(),
-              builder: (data) => Center(
-                child: Text(
-                  data.dailyIncome.toString(),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }),
+          body: Builder(
+            builder: (ctx) {
+              final data = ctx.read<DataHolder>().data;
+              return switch (data.watch(ctx)) {
+                AsyncData<DailyNetIncomeData>(value: final v) => Center(
+                    child: Text(
+                      v.toString(),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                AsyncError(error: final e) => Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Text('Error: $e'),
+                    ),
+                  ),
+                _ => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+              };
+            },
+          ),
         ),
       ),
     );
